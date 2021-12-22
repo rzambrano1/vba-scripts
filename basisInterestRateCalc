@@ -1,1 +1,392 @@
+'####################################################################### 
+'THIS MODULE ASSUMES AMORTIZATION SCHEDULE AND CALCULATES THE LOAN'S WAL
+'#######################################################################
 
+Private Sub CommandButton1_Click()
+For i = 10 To 30
+Rows(i).EntireRow.Delete
+Next i
+Range("A10:G2510").Clear
+Range("Q10:Q2510").Clear
+Range("J10:K100").Clear
+Range("A10:A2510").Interior.ColorIndex = 2
+Range("B10:B2510").NumberFormat = "yyyy-mm-dd"
+Range("C10:D2510").NumberFormat = "$#,##0.00"
+Range("E10:E2510").NumberFormat = "0.00"
+Range("F10:F2510").NumberFormat = "$#,##0.00"
+Range("B10:B2510").HorizontalAlignment = xlCenter
+Range("A10:G2510").Borders.LineStyle = xlContinuous
+Range("Q10:Q2510").Borders.LineStyle = xlContinuous
+'===================================================
+Dim today As Date
+Dim mnth As Integer
+Dim yr As Integer
+Dim dy As Integer
+Dim frqc As Integer
+Dim flg As Boolean
+Dim flg2 As Boolean
+Dim dsbr As Integer
+Dim frstDsbr As Date
+Dim dateToFind As Date
+Dim rowDateFound As Integer
+Dim nvgtnCounter As Integer
+Dim paymentsPrinc As Integer
+Dim frstPay As Date
+Dim rowPatFound As Integer
+Dim wkday As String
+' Error Handling
+On Error GoTo errhdl
+'========================================================
+' This section is meant to setup the WAL worksheet
+' It setups the number of disbursements as well as the
+' frequency of payments. With that information it setups
+' calendar dates for typing in the cash amounts
+'========================================================
+MsgBox ("This program will take information for a single disbursement 
+and estimate the WAL")
+Cells(6, 3).Value = 1
+flg = False
+While flg = False
+frqc = InputBox("Type the frequency of payments in months [i.e.: for 
+payments every quearter type 3, for payments every six months type 6, 
+and so on]")
+If frqc < 1 Then
+MsgBox ("Please type a value greater than zero. More than one payment 
+per month is not allowed in this model.")
+flg = False
+ElseIf frqc > 0 And frqc < 13 Then
+flg = True
+ElseIf frqc > 12 Then
+MsgBox ("Please type a value smaller than 13")
+flg = False
+Else
+flg = False
+End If
+Wend
+Cells(5, 3).Value = frqc
+today = Date
+mnth = month(today)
+yr = Year(today)
+dy = 30
+'=============================================================
+' This section collects information about each disbursement
+' as well as about the amortization schedule. It creates an
+' Index table to help the user navigate to the specific dates
+' of the disbursements in order to input the cash flows
+'=============================================================
+flg = False
+While flg = False
+frstDsbr = InputBox("Type the date of the disbursement in YYYY-MM-DD 
+format.")
+Cells(10, 2).Value = frstDsbr
+Cells(10, 17).Value = WorksheetFunction.Weekday(Cells(10, 2))
+If Cells(10, 17) = 2 Then
+flg = True
+ElseIf Cells(10, 17) = 3 Then
+flg = True
+ElseIf Cells(10, 17) = 4 Then
+flg = True
+ElseIf Cells(10, 17) = 5 Then
+flg = True
+ElseIf Cells(10, 17) = 6 Then
+flg = True
+Else
+MsgBox ("The date entered is a weekend or an invalid number. Please 
+enter a weekday.")
+flg = False
+End If
+Wend
+' This section creates format for inputs
+Cells(10, 1).Value = 1
+Cells(10, 1).Interior.ColorIndex = 28
+Cells(10, 3).Interior.ColorIndex = 28
+' This section collects the payments to principal
+paymentsPrinc = InputBox("Type number of payments to principal for 
+this disbursement")
+frstPay = InputBox("Type the scheduled date for the first payment to 
+principal in YYYY-MM-DD format")
+Cells(11, 2).Value = frstPay
+Cells(11, 17).Value = WorksheetFunction.Weekday(Cells(10, 2))
+For i = 12 To 1000
+Cells(i, 2).Value = WorksheetFunction.EDate(Cells(i - 1, 2), frqc)
+Cells(i, 17).Value = WorksheetFunction.Weekday(Cells(i, 2))
+Next i
+' Adjusment section To avoid NYSE Holidays
+For i = 11 To 1000
+If Cells(i, 15) = 1 Then
+Cells(i, 2).Value = Cells(i, 2) + 1
+End If
+Next i
+' Adjusment section To avoid weekends
+For i = 11 To 1000
+If Cells(i, 14) = 1 Then
+Cells(i, 2).Value = Cells(i, 2) + 1
+End If
+Next i
+For i = 11 To 1000
+If Cells(i, 19) = 1 Then
+Cells(i, 2).Value = Cells(i, 2) + 2
+End If
+Next i
+For i = 12 To 1000
+Cells(i, 17).Value = WorksheetFunction.Weekday(Cells(i, 2))
+Next i
+Cells(10, 4).Interior.ColorIndex = 41
+Cells(10, 4).Font.Color = vbWhite
+Cells(10, 4).Value = "startAmort" & disbursement
+Cells(11 + paymentsPrinc, 4).Interior.ColorIndex = 41
+Cells(11 + paymentsPrinc, 4).Font.Color = vbWhite
+Cells(11 + paymentsPrinc, 4).Value = "endAmort" & disbursement
+For j = 11 To (11 + paymentsPrinc - 1)
+Cells(j, 4).Interior.ColorIndex = 28
+Next j
+Cells(1, 13).Value = "step2 missing"
+Done:
+Exit Sub
+errhdl:
+MsgBox ("Start Over. The latest input does not meet the required 
+format. Avoid letters and special characters other than - to separate 
+date fields.")
+End Sub
+Private Sub CommandButton2_Click()
+Dim rowDisbFound As Integer
+Dim rowPayStartFound As Integer
+Dim rowPayEbdFound As Integer
+Dim numbPayDisb As Integer
+Dim numbDisb As Integer
+Dim sumDisb As Double
+Dim sumAmort As Double
+numbDisb = Cells(6, 3).Value
+For disbursement = 1 To numbDisb
+For j = 10 To 2500
+If Cells(j, 1).Value = disbursement Then
+rowDisbFound = j
+End If
+Next j
+For i = 10 To 2500
+If Cells(i, 4).Value = "startAmort" Then
+rowPayStartFound = i
+End If
+Next i
+For k = 10 To 2500
+If Cells(k, 4).Value = "endAmort" Then
+rowPayEndFound = k
+End If
+Next k
+numbPayDisb = rowPayEndFound - rowPayStartFound - 1
+sumDisb = Cells(rowDisbFound, 3)
+sumAmort = 0
+For payX = (rowPayStartFound + 1) To (rowPayEndFound - 1)
+sumAmort = sumAmort + Cells(payX, 4)
+Next payX
+If sumDisb <> sumAmort Then
+MsgBox ("ATTENTION: The Disbursement Amount for Disbursement[" & 
+disbursement & "] and the Sum of Payments to Principal Do Not Match!")
+End If
+For indx = (rowPayStartFound + 1) To (rowPayEndFound - 1)
+Cells(indx, 5).Value = WorksheetFunction.YearFrac(Cells(rowDisbFound, 
+2), Cells(indx, 2), 3)
+Cells(indx, 6).Value = Cells(indx, 4) * Cells(indx, 5)
+Next indx
+Next disbursement
+Cells(1, 13).Value = Cells(4, 10)
+Sheets("interestRate").Cells(3, 13).Value = CInt(Cells(4, 10) * 365)
+MsgBox ("The Weighted Avg. Life value was pasted on the Interest Rate 
+field in days.")
+End Sub
+Private Sub CommandButton3_Click()
+Application.ScreenUpdating = False
+For i = 1 To 21
+For j = 1 To 7
+Worksheets("frmts").Cells(i, j).Copy
+Worksheets("weightedAvgLife").Cells((i + 9), j).PasteSpecial 
+Paste:=xlPasteFormats
+Worksheets("weightedAvgLife").Cells((i + 9), j).PasteSpecial 
+Paste:=xlPasteValues
+Next j
+Next i
+Cells(1, 13).Value = "step1 and step2 Missing"
+Cells(5, 3).Value = 0
+Cells(6, 3).Value = 0
+Application.ScreenUpdating = True
+End Sub
+Private Sub CommandButton4_Click()
+ThisWorkbook.Sheets("interestRate").Activate
+End Sub
+
+'###################################################################
+'THIS MODULE DOWNLOADS THE CURRENT-DAY INTEREST RATES FROM THE 
+'U.S. TREASURY AND CALCULATES A BASIS INTEREST RATE BASED ON THE WAL 
+'CALCULATED BY THE PREVIOUS MODULE 
+'###################################################################
+
+Private Sub CommandButton1_Click()
+MsgBox ("Click OK in the next two prompts")
+Dim treasuryURL As String
+treasuryURL = "https://data.treasury.gov/feed.svc/
+DailyTreasuryYieldCurveRateData?$filter=year(NEW_DATE)%20eq%202021"
+'treasuryURL = "S:\TD\RicardoZambrano\yieldRates\treasuryData.xml"
+Sheets("yieldTable").Cells.Clear
+Cells(1, 13).Value = "step2 and step3 missing"
+'Cells(3, 13).Value = 0
+Range("R4:R6").Value = 0
+ThisWorkbook.XmlImport URL:=treasuryURL, ImportMap:=Nothing, 
+Overwrite:=True, Destination:=Worksheets("yieldTable").Range("$A$1")
+Cells(1, 2).Value = Worksheets("yieldTable").Cells(2, 11).Value
+Range("A12:A378").Value = 
+Worksheets("yieldTable").Range("U2:U368").Value
+Range("B12:B378").Value = 
+Worksheets("yieldTable").Range("W2:W368").Value
+Range("C12:C378").Value = 
+Worksheets("yieldTable").Range("Y2:Y368").Value
+Range("D12:D378").Value = 
+Worksheets("yieldTable").Range("AA2:AA368").Value
+Range("E12:E378").Value = 
+Worksheets("yieldTable").Range("AC2:AC368").Value
+Range("F12:F378").Value = 
+Worksheets("yieldTable").Range("AE2:AE368").Value
+Range("G12:G378").Value = 
+Worksheets("yieldTable").Range("AG2:AG368").Value
+Range("H12:H378").Value = 
+Worksheets("yieldTable").Range("AI2:AI368").Value
+Range("I12:I378").Value = 
+Worksheets("yieldTable").Range("AK2:AK368").Value
+Range("J12:J378").Value = 
+Worksheets("yieldTable").Range("AM2:AM368").Value
+Range("K12:K378").Value = 
+Worksheets("yieldTable").Range("AO2:AO368").Value
+Range("L12:L378").Value = 
+Worksheets("yieldTable").Range("AQ2:AQ368").Value
+Range("M12:M378").Value = 
+Worksheets("yieldTable").Range("AS2:AS368").Value
+End Sub
+Private Sub CommandButton2_Click()
+Dim today As String
+Dim dataTest As String
+If Weekday(Date) = 1 Then
+lastReportDay = Date - 2
+ElseIf Weekday(Date) = 7 Then
+lastReportDay = Date - 1
+Else
+lastReportDay = Date
+End If
+'MsgBox (lastReportDay)
+Cells(8, 1).Value = lastReportDay
+' THIS BLOCK IS TO ADJUST THE DATE IN CASE OF HOLIDAYS - THE FIRST 
+BLOCK WILL TAKE THE DATE TWO BUSINESS DAYS PRIOR, IF THERE IS NO DATA 
+ON THAT DATE IT WILL KEEP PUSGHING THE DATE BACKWARDS
+'dataTest = False
+dataTest = Application.WorksheetFunction.IsNA(Cells(8, 2).Value)
+While dataTest = True
+lastReportDay = lastReportDay - 1
+Cells(8, 1).Value = lastReportDay
+dataTest = Application.WorksheetFunction.IsNA(Cells(8, 2).Value)
+Wend
+' ### These are tests
+'MsgBox (dataTest)
+'If dataTest = True Then
+'lastReportDay = lastReportDay - 1
+'End If
+'MsgBox (lastReportDay)
+' ### End of tests
+Cells(1, 13).Value = "step3 missing"
+End Sub
+Private Sub CommandButton3_Click()
+Dim daysMatur As Double
+Dim err As Double
+Dim daysDiff As Double
+daysMatur = Worksheets("interestRate").Cells(3, 13).Value
+'MsgBox (daysMatur)
+err = 1E-09
+roundDays = Round(daysMatur, 0)
+daysDiff = Abs(roundDays - daysMatur)
+If daysDiff > 0 Then
+Cells(1, 13).Value = "error"
+MsgBox ("Type a Round Number of Days")
+Exit Sub
+End If
+'These statements take care of values outside the range
+If daysMatur < 30 Then
+Cells(1, 13).Value = "error"
+MsgBox ("Type a period to maturity larger than 30 days")
+ElseIf daysMatur > 10950 Then
+Cells(1, 13).Value = "error"
+MsgBox ("Type a period to maturity smaller than 10950 days")
+End If
+'These statements make interpolation calculations for valid values
+If daysMatur = 30 Then
+Cells(1, 13).Value = Cells(8, 2).Value
+ElseIf daysMatur > 30 And daysMatur < 60 Then
+Cells(1, 13).Value = Cells(8, 2).Value + ((Cells(3, 13).Value - 
+Cells(9, 2).Value) * ((Cells(8, 3).Value - Cells(8, 2).Value) / 
+(Cells(9, 3).Value - Cells(9, 2).Value)))
+ElseIf daysMatur = 60 Then
+Cells(1, 13).Value = Cells(8, 3).Value
+ElseIf daysMatur > 60 And daysMatur < 90 Then
+Cells(1, 13).Value = Cells(8, 3).Value + ((Cells(3, 13).Value - 
+Cells(9, 3).Value) * ((Cells(8, 4).Value - Cells(8, 3).Value) / 
+(Cells(9, 4).Value - Cells(9, 3).Value)))
+ElseIf daysMatur = 90 Then
+Cells(1, 13).Value = Cells(8, 4).Value
+ElseIf daysMatur > 90 And daysMatur < 180 Then
+Cells(1, 13).Value = Cells(8, 4).Value + ((Cells(3, 13).Value - 
+Cells(9, 4).Value) * ((Cells(8, 5).Value - Cells(8, 4).Value) / 
+(Cells(9, 5).Value - Cells(9, 4).Value)))
+ElseIf daysMatur = 180 Then
+Cells(1, 13).Value = Cells(8, 5).Value
+ElseIf daysMatur > 180 And daysMatur < 365 Then
+Cells(1, 13).Value = Cells(8, 5).Value + ((Cells(3, 13).Value - 
+Cells(9, 5).Value) * ((Cells(8, 6).Value - Cells(8, 5).Value) / 
+(Cells(9, 6).Value - Cells(9, 5).Value)))
+ElseIf daysMatur = 365 Then
+Cells(1, 13).Value = Cells(8, 6).Value
+ElseIf daysMatur > 365 And daysMatur < 730 Then
+Cells(1, 13).Value = Cells(8, 6).Value + ((Cells(3, 13).Value - 
+Cells(9, 6).Value) * ((Cells(8, 7).Value - Cells(8, 6).Value) / 
+(Cells(9, 7).Value - Cells(9, 6).Value)))
+ElseIf daysMatur = 730 Then
+Cells(1, 13).Value = Cells(8, 7).Value
+ElseIf daysMatur > 730 And daysMatur < 1095 Then
+Cells(1, 13).Value = Cells(8, 7).Value + ((Cells(3, 13).Value - 
+Cells(9, 7).Value) * ((Cells(8, 8).Value - Cells(8, 7).Value) / 
+(Cells(9, 8).Value - Cells(9, 7).Value)))
+ElseIf daysMatur = 1095 Then
+Cells(1, 13).Value = Cells(8, 8).Value
+ElseIf daysMatur > 1095 And daysMatur < 1825 Then
+Cells(1, 13).Value = Cells(8, 8).Value + ((Cells(3, 13).Value - 
+Cells(9, 8).Value) * ((Cells(8, 9).Value - Cells(8, 8).Value) / 
+(Cells(9, 9).Value - Cells(9, 8).Value)))
+ElseIf daysMatur = 1825 Then
+Cells(1, 13).Value = Cells(8, 9).Value
+ElseIf daysMatur > 1825 And daysMatur < 2555 Then
+Cells(1, 13).Value = Cells(8, 9).Value + ((Cells(3, 13).Value - 
+Cells(9, 9).Value) * ((Cells(8, 10).Value - Cells(8, 9).Value) / 
+(Cells(9, 10).Value - Cells(9, 9).Value)))
+ElseIf daysMatur = 2555 Then
+Cells(1, 13).Value = Cells(8, 10).Value
+ElseIf daysMatur > 2555 And daysMatur < 3650 Then
+Cells(1, 13).Value = Cells(8, 10).Value + ((Cells(3, 13).Value - 
+Cells(9, 10).Value) * ((Cells(8, 11).Value - Cells(8, 10).Value) / 
+(Cells(9, 11).Value - Cells(9, 10).Value)))
+ElseIf daysMatur = 3650 Then
+Cells(1, 13).Value = Cells(8, 11).Value
+ElseIf daysMatur > 3650 And daysMatur < 7300 Then
+Cells(1, 13).Value = Cells(8, 11).Value + ((Cells(3, 13).Value - 
+Cells(9, 11).Value) * ((Cells(8, 12).Value - Cells(8, 11).Value) / 
+(Cells(9, 12).Value - Cells(9, 11).Value)))
+ElseIf daysMatur = 7300 Then
+Cells(1, 13).Value = Cells(8, 12).Value
+ElseIf daysMatur > 7300 And daysMatur < 10950 Then
+Cells(1, 13).Value = Cells(8, 12).Value + ((Cells(3, 13).Value - 
+Cells(9, 12).Value) * ((Cells(8, 13).Value - Cells(8, 12).Value) / 
+(Cells(9, 13).Value - Cells(9, 12).Value)))
+ElseIf daysMatur = 10950 Then
+Cells(1, 13).Value = Cells(8, 13).Value
+End If
+End Sub
+Private Sub CommandButton4_Click()
+Cells(3, 13).Value = Cells(11, 16)
+End Sub
+Private Sub CommandButton5_Click()
+ThisWorkbook.Sheets("amortizationSch").Activate
+End Sub
